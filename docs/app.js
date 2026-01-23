@@ -231,10 +231,6 @@ function createArticleCard(item, viewMode) {
         <p class="article-excerpt">${item.description}</p>
         <div class="article-meta">
             <span class="article-meta-item">
-                <i class="bi bi-calendar3"></i>
-                ${item.formattedDate}
-            </span>
-            <span class="article-meta-item">
                 <i class="bi bi-clock"></i>
                 ${relativeTime}
             </span>
