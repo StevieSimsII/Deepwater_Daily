@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Deepwater Daily | Gulf of America Oil & Gas News</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+    
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    
+    <!-- D3.js for data loading -->
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    
+    <!-- Custom Styles -->
+    <link rel="stylesheet" href="styles.css">
+    
+    <!-- Favicon -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛢️</text></svg>">
+    
+    <!-- Meta tags for SEO -->
+    <meta name="description" content="Daily updates on Gulf of America deepwater drilling, oil & gas exploration, pipelines, crude oil, natural gas, and integrated gas industry news.">
+    <meta name="keywords" content="deepwater drilling, Gulf of America, Gulf of Mexico, oil and gas, offshore drilling, crude oil, natural gas, pipelines, LNG, subsea, exploration">
+    <meta property="og:title" content="Deepwater Daily">
+    <meta property="og:description" content="Daily updates on Gulf of America deepwater drilling and oil & gas industry news">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://steviesimsii.github.io/Deepwater_Daily/">
+</head>
+<body>
+    <!-- Header / Navigation -->
+    <header class="header">
+        <div class="header-container">
+            <a href="#" class="logo">
+                <span class="logo-icon">🛢️</span>
+                <span class="logo-text">Deepwater Daily</span>
+            </a>
+            <nav class="nav">
+                <a href="#" class="nav-link active" id="all-news-link">Articles</a>
+                <a href="#" class="nav-link" id="about-link">About</a>
+            </nav>
+            <div class="header-actions">
+                <div class="search-container">
+                    <input type="search" class="search-input" placeholder="Search articles..." id="search-input">
+                    <button class="search-btn" id="search-button">
+                        <i class="bi bi-search"></i>
+                    </button>
+                </div>
+                <button class="theme-toggle" id="theme-toggle" aria-label="Toggle dark mode">
+                    <i class="bi bi-moon-fill" id="theme-icon"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="container">
+            <!-- Hero Section -->
+            <section class="hero" id="hero-section">
+                <h1 class="hero-title">Deepwater Daily</h1>
+                <p class="hero-subtitle">Your trusted source for Gulf of America deepwater drilling, oil & gas exploration, pipelines, and energy industry news</p>
+            </section>
+
+            <!-- All News View -->
+            <section id="all-news-view">
+                <!-- Category Filter -->
+                <div class="filter-bar">
+                    <div class="filter-tabs">
+                        <button class="filter-tab active" data-category="all">All</button>
+                        <button class="filter-tab" data-category="deepwater drilling">Deepwater</button>
+                        <button class="filter-tab" data-category="gulf of america">Gulf of America</button>
+                        <button class="filter-tab" data-category="crude oil">Crude Oil</button>
+                        <button class="filter-tab" data-category="natural gas">Natural Gas</button>
+                        <button class="filter-tab" data-category="subsea & pipelines">Pipelines</button>
+                        <button class="filter-tab" data-category="lng & integrated gas">LNG</button>
+                    </div>
+                    <div class="view-toggle">
+                        <button class="view-btn active" id="article-view-btn" title="Article View">
+                            <i class="bi bi-file-text"></i>
+                        </button>
+                        <button class="view-btn" id="grid-view-btn" title="Grid View">
+                            <i class="bi bi-grid-3x3-gap"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Articles Container -->
+                <div class="articles-container" id="news-container">
+                    <!-- Loading State -->
+                    <div class="loading-state" id="loading-indicator">
+                        <div class="loading-spinner"></div>
+                        <p>Loading latest industry news...</p>
+                    </div>
+                </div>
+
+                <!-- No Results -->
+                <div class="no-results" id="no-results" style="display: none;">
+                    <i class="bi bi-search"></i>
+                    <h3>No Articles Found</h3>
+                    <p>Try adjusting your search or filter criteria.</p>
+                </div>
+
+                <!-- Load More -->
+                <div class="load-more-container">
+                    <button class="load-more-btn" id="load-more-btn">Load More Articles</button>
+                </div>
+            </section>
+
+            <!-- About View -->
+            <section id="about-view" class="about-section" style="display: none;">
+                <article class="about-article">
+                    <h1>About Deepwater Daily</h1>
+                    
+                    <h2>What is Deepwater Daily?</h2>
+                    <p>
+                        Deepwater Daily is an automated news aggregator focused on the Gulf of America deepwater drilling, 
+                        oil & gas exploration, and energy industry. We collect and curate the latest articles, reports, 
+                        and insights from leading industry sources to keep professionals, investors, and enthusiasts 
+                        informed about developments in offshore energy.
+                    </p>
+                    
+                    <h2>Our Focus Areas</h2>
+                    <ul>
+                        <li><strong>Deepwater Drilling:</strong> Ultra-deepwater operations, drilling rigs, drillships, and semi-submersibles</li>
+                        <li><strong>Gulf of America Operations:</strong> OCS leasing, BOEM/BSEE updates, and regional developments</li>
+                        <li><strong>Crude Oil & Natural Gas:</strong> Production data, pricing trends, and market analysis</li>
+                        <li><strong>Subsea & Pipelines:</strong> Infrastructure projects, flowlines, and subsea systems</li>
+                        <li><strong>LNG & Integrated Gas:</strong> Export terminals, FLNG, and gas processing</li>
+                        <li><strong>Wells & Exploration:</strong> Discoveries, well completions, and prospect updates</li>
+                    </ul>
+                    
+                    <h2>How It Works</h2>
+                    <p>
+                        Deepwater Daily is powered by a custom Python script that:
+                    </p>
+                    <ul>
+                        <li>Fetches RSS feeds from major oil & gas news sources and industry publications</li>
+                        <li>Filters articles for deepwater drilling and Gulf of America relevant content</li>
+                        <li>Categorizes content by topic for easy navigation</li>
+                        <li>Updates daily to ensure you have the latest industry news</li>
+                    </ul>
+                    
+                    <h2>Data Sources</h2>
+                    <p>We aggregate content from trusted industry sources including:</p>
+                    <ul>
+                        <li>Offshore Magazine</li>
+                        <li>Rigzone</li>
+                        <li>World Oil</li>
+                        <li>Oil Price</li>
+                        <li>Offshore Technology</li>
+                        <li>Oil & Gas Journal</li>
+                        <li>S&P Global Commodity Insights</li>
+                        <li>BOEM & BSEE (Bureau of Ocean Energy Management & Bureau of Safety and Environmental Enforcement)</li>
+                        <li>EIA (Energy Information Administration)</li>
+                        <li>Major operator news (ExxonMobil, Chevron, Shell, BP)</li>
+                    </ul>
+                    
+                    <h2>Updates</h2>
+                    <p>
+                        The data on this site is updated daily. Each update brings fresh content from our 
+                        curated sources, ensuring you never miss important industry developments.
+                    </p>
+                    
+                    <h2>Contact</h2>
+                    <p>
+                        For more information or feedback, contact Stevie Sims 🧑🏼‍💻
+                    </p>
+                </article>
+            </section>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="footer-container">
+            <div class="footer-brand">
+                <span class="logo-icon">🛢️</span>
+                <span>Deepwater Daily</span>
+                <p class="footer-tagline">Gulf of America Oil & Gas News</p>
+            </div>
+            <div class="footer-links">
+                <a href="#" id="footer-all-news">Articles</a>
+                <a href="#" id="footer-about">About</a>
+            </div>
+            <div class="footer-info">
+                <p>&copy; <span id="current-year">2026</span> Deepwater Daily. All rights reserved.</p>
+                <p class="last-updated">Last Updated: <span id="last-updated-date">Loading...</span></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Scripts -->
+    <script src="app.js"></script>
+    <script>
+        // Set current year
+        document.getElementById('current-year').textContent = new Date().getFullYear();
+        
+        // Footer link handlers
+        document.getElementById('footer-all-news').addEventListener('click', function(e) {
+            e.preventDefault();
+            document.getElementById('all-news-link').click();
+        });
+        document.getElementById('footer-about').addEventListener('click', function(e) {
+            e.preventDefault();
+            document.getElementById('about-link').click();
+        });
+    </script>
+</body>
+</html>
