@@ -1,0 +1,46 @@
+name: Daily Deepwater News Collector
+
+on:
+  schedule:
+    # Runs daily at 6:00 AM UTC (adjust as needed)
+    - cron: '0 6 * * *'
+  workflow_dispatch:  # Allows manual triggering from GitHub UI
+
+permissions:
+  contents: write
+
+jobs:
+  collect-news:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run news collector
+        run: python deepwater_news_collector.py
+
+      - name: Update last update timestamp
+        run: |
+          echo '{"last_update": "'$(date -u +"%Y-%m-%dT%H:%M:%SZ")'", "status": "success"}' > docs/data/last_update.json
+
+      - name: Commit and push changes
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add docs/data/deepwater_news.csv docs/data/last_update.json article_history.txt
+          git diff --staged --quiet || git commit -m "📰 Daily news update - $(date -u +"%Y-%m-%d")"
+          git push
