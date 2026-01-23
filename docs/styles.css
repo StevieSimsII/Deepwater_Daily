@@ -370,7 +370,7 @@ body {
 .article-card {
     background: var(--bg-card);
     border-bottom: 1px solid var(--border-color);
-    padding: var(--spacing-xl) 0;
+    padding: var(--spacing-xl) 0 var(--spacing-xl) var(--spacing-xl);
     transition: all var(--transition-base);
 }
 
