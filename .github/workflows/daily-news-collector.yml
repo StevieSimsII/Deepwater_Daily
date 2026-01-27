@@ -2,8 +2,9 @@ name: Daily Deepwater News Collector
 
 on:
   schedule:
-    # Runs daily at 6:00 AM UTC (adjust as needed)
-    - cron: '0 6 * * *'
+    # Runs daily at 6:00 AM CST (12:00 PM UTC)
+    # CST is UTC-6, so 6:00 AM CST = 12:00 PM UTC
+    - cron: '0 12 * * *'
   workflow_dispatch:  # Allows manual triggering from GitHub UI
 
 permissions:
