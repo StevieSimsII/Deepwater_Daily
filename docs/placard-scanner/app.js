@@ -9,6 +9,7 @@
 
   // ── DOM References ──
   const $ = (sel) => document.querySelector(sel);
+  const cameraContainer = $('#cameraContainer');
   const cameraFeed = $('#cameraFeed');
   const captureCanvas = $('#captureCanvas');
   const capturedImage = $('#capturedImage');
@@ -72,6 +73,7 @@
         }
       });
       cameraFeed.srcObject = cameraStream;
+      cameraContainer.classList.add('camera-active');
       cameraFeed.classList.remove('hidden');
       cameraPlaceholder.classList.add('hidden');
       cameraOverlay.classList.remove('hidden');
@@ -275,6 +277,7 @@
   function resetToScanner() {
     stopCamera();
     currentResult = null;
+    cameraContainer.classList.remove('camera-active');
     capturedImage.classList.add('hidden');
     cameraFeed.classList.add('hidden');
     cameraPlaceholder.classList.remove('hidden');

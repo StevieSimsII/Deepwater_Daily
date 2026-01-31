@@ -137,10 +137,14 @@ body {
   background: #000;
   border-radius: 12px;
   overflow: hidden;
-  aspect-ratio: 4/3;
+  min-height: 200px;
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.camera-container.camera-active {
+  aspect-ratio: 4/3;
 }
 
 .camera-container video {
