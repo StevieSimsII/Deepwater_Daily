@@ -2,9 +2,12 @@
  * Hazmat Placard Data
  * Maps UN/NA numbers to chemical info, hazard classes, pictogram meanings, and SDS links.
  * Covers the most common hazardous materials encountered in transportation.
+ *
+ * Uses var for cross-script global access compatibility.
  */
 
-const HAZARD_CLASSES = {
+/* eslint-disable no-unused-vars */
+var HAZARD_CLASSES = {
   "1": { name: "Explosives", color: "#FF4500", icon: "exploding-bomb" },
   "1.1": { name: "Explosives - Mass Explosion Hazard", color: "#FF4500", icon: "exploding-bomb" },
   "1.2": { name: "Explosives - Projection Hazard", color: "#FF4500", icon: "exploding-bomb" },
@@ -28,77 +31,66 @@ const HAZARD_CLASSES = {
   "9": { name: "Miscellaneous Dangerous Goods", color: "#FFFFFF", icon: "exclamation" }
 };
 
-const GHS_PICTOGRAMS = {
+var GHS_PICTOGRAMS = {
   "exploding-bomb": {
     name: "Exploding Bomb",
-    svg: "explosion",
     meaning: "Explosives, self-reactive substances, organic peroxides",
     precautions: ["Keep away from heat, sparks, open flames", "Do not handle until all safety precautions have been read", "Wear protective equipment"]
   },
   "flame": {
     name: "Flame",
-    svg: "flame",
     meaning: "Flammable gases, aerosols, liquids, solids; pyrophoric substances; self-heating substances; substances that emit flammable gases when in contact with water",
     precautions: ["Keep away from heat, sparks, open flames, hot surfaces", "Keep container tightly closed", "Ground/bond container and receiving equipment", "Use explosion-proof electrical/ventilating/lighting equipment"]
   },
   "flame-over-circle": {
     name: "Flame Over Circle",
-    svg: "oxidizer",
     meaning: "Oxidizers - may cause or intensify fire",
     precautions: ["Keep away from heat, sparks, open flames", "Keep away from clothing and other combustible materials", "Wear protective equipment"]
   },
   "gas-cylinder": {
     name: "Gas Cylinder",
-    svg: "gas-cylinder",
     meaning: "Gases under pressure - may explode if heated",
     precautions: ["Protect from sunlight", "Store in well-ventilated place", "Use pressure-reducing valve"]
   },
   "corrosion": {
     name: "Corrosion",
-    svg: "corrosion",
     meaning: "Corrosive to metals; causes severe skin burns and eye damage",
     precautions: ["Do not breathe dust/fumes/gas/mist/vapors/spray", "Wash thoroughly after handling", "Wear protective gloves/clothing/eye protection/face protection"]
   },
   "skull-crossbones": {
     name: "Skull and Crossbones",
-    svg: "skull",
     meaning: "Acute toxicity (fatal or toxic if swallowed, in contact with skin, or if inhaled)",
     precautions: ["Wash hands thoroughly after handling", "Do not eat, drink, or smoke when using this product", "If swallowed: immediately call a Poison Center", "Wear protective equipment"]
   },
   "exclamation": {
     name: "Exclamation Mark",
-    svg: "exclamation",
     meaning: "Irritant; skin sensitizer; acute toxicity (harmful); narcotic effects; respiratory tract irritation; hazardous to ozone layer",
     precautions: ["Avoid breathing dust/fumes/gas/mist", "Use only outdoors or in well-ventilated area", "Wear protective equipment"]
   },
   "health-hazard": {
     name: "Health Hazard",
-    svg: "health-hazard",
     meaning: "Carcinogen; mutagenicity; reproductive toxicity; respiratory sensitizer; target organ toxicity; aspiration toxicity",
     precautions: ["Obtain special instructions before use", "Do not handle until safety precautions are read", "Use personal protective equipment as required"]
   },
   "biohazard": {
     name: "Biohazard",
-    svg: "biohazard",
     meaning: "Infectious substances - capable of causing disease in humans or animals",
     precautions: ["Avoid contact with skin and eyes", "Wear appropriate personal protective equipment", "Decontaminate all materials before disposal"]
   },
   "radioactive": {
     name: "Radioactive",
-    svg: "radioactive",
     meaning: "Radioactive material - emits ionizing radiation",
     precautions: ["Minimize exposure time", "Maximize distance from source", "Use appropriate shielding", "Monitor radiation levels"]
   },
   "environment": {
     name: "Environment",
-    svg: "environment",
     meaning: "Hazardous to the aquatic environment",
     precautions: ["Avoid release to the environment", "Collect spillage", "Dispose of contents/container in accordance with regulations"]
   }
 };
 
 // Common UN numbers database - most frequently encountered in transportation
-const UN_NUMBERS = {
+var UN_NUMBERS = {
   "1001": { name: "Acetylene, dissolved", class: "2.1", sds: "acetylene", guide: 116 },
   "1005": { name: "Ammonia, anhydrous", class: "2.3", sds: "ammonia-anhydrous", guide: 125, secondaryHazard: ["8"] },
   "1006": { name: "Argon, compressed", class: "2.2", sds: "argon", guide: 121 },
@@ -203,7 +195,7 @@ const UN_NUMBERS = {
 };
 
 // NFPA 704 Diamond ratings
-const NFPA_RATINGS = {
+var NFPA_RATINGS = {
   health: {
     0: { level: "Minimal", description: "No significant risk to health" },
     1: { level: "Slight", description: "Exposure would cause irritation with only minor residual injury" },
@@ -237,26 +229,26 @@ const NFPA_RATINGS = {
   }
 };
 
-// ERG (Emergency Response Guidebook) guide pages
+// ERG (Emergency Response Guidebook) guide URL
 function getERGGuideUrl(guideNumber) {
-  return `https://www.phmsa.dot.gov/hazmat/erg/emergency-response-guidebook-erg`;
+  return "https://www.phmsa.dot.gov/hazmat/erg/emergency-response-guidebook-erg";
 }
 
 // SDS lookup URLs - multiple sources
 function getSDSUrls(substance) {
-  const encodedName = encodeURIComponent(substance.name);
+  var encodedName = encodeURIComponent(substance.name);
   return [
     {
       name: "Fisher Scientific SDS",
-      url: `https://www.fishersci.com/us/en/catalog/search/sds?keyword=${encodedName}`
+      url: "https://www.fishersci.com/us/en/catalog/search/sds?keyword=" + encodedName
     },
     {
       name: "Sigma-Aldrich SDS",
-      url: `https://www.sigmaaldrich.com/US/en/search/${encodedName}?focus=documents&page=1&perpage=30&sort=relevance&term=${encodedName}&type=sds`
+      url: "https://www.sigmaaldrich.com/US/en/search/" + encodedName + "?focus=documents&page=1&perpage=30&sort=relevance&term=" + encodedName + "&type=sds"
     },
     {
       name: "CAMEO Chemicals (NOAA)",
-      url: `https://cameochemicals.noaa.gov/search/simple?la=en&q=${encodedName}`
+      url: "https://cameochemicals.noaa.gov/search/simple?la=en&q=" + encodedName
     },
     {
       name: "ERG Guide",
@@ -264,7 +256,7 @@ function getSDSUrls(substance) {
     },
     {
       name: "NIOSH Pocket Guide",
-      url: `https://www.cdc.gov/niosh/npg/search.html?searchTerm=${encodedName}`
+      url: "https://www.cdc.gov/niosh/npg/search.html?searchTerm=" + encodedName
     }
   ];
 }
