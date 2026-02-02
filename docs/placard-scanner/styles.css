@@ -193,6 +193,10 @@ body {
 }
 
 .camera-placeholder {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -200,6 +204,7 @@ body {
   color: var(--text-muted);
   padding: 40px 20px;
   text-align: center;
+  width: 100%;
 }
 
 .camera-placeholder .icon {
