@@ -482,6 +482,35 @@ body {
   margin-top: 2px;
 }
 
+.api-source-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: var(--success);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin-top: 8px;
+  margin-left: 6px;
+}
+
+.formula-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: var(--bg-card-hover);
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  font-weight: 500;
+  margin-top: 8px;
+  margin-left: 6px;
+  font-family: 'JetBrains Mono', monospace;
+}
+
 /* Pictograms */
 .pictograms-card {
   background: var(--bg-card);

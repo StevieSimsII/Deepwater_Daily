@@ -166,27 +166,118 @@ document.addEventListener('DOMContentLoaded', function () {
       showToast('Please enter a valid 4-digit UN/NA number.', 'error');
       return;
     }
-    // Accept any 4-digit UN/NA number
-    displayResults(num);
+    // Check local database first, then try external API
+    if (UN_NUMBERS[num]) {
+      displayResults(num, UN_NUMBERS[num]);
+    } else {
+      lookupExternalAPI(num);
+    }
+  }
+
+  // ── External API Lookup ──
+  function lookupExternalAPI(unNumber) {
+    showView('processing');
+    processingText.textContent = 'Looking up UN ' + unNumber + '...';
+
+    // Use CAMEO Chemicals API (NOAA) - free and comprehensive
+    var apiUrl = 'https://cameochemicals.noaa.gov/api/search?un=' + unNumber;
+    
+    // Since CAMEO doesn't have CORS enabled, we'll use a workaround
+    // by fetching from multiple sources and using the ERG database
+    fetchFromERG(unNumber);
+  }
+
+  function fetchFromERG(unNumber) {
+    // ERG (Emergency Response Guidebook) data via proxy or direct lookup
+    // Using the UN Recommendations data structure
+    var ergApiUrl = 'https://wwwapps.tc.gc.ca/Saf-Sec-Sur/3/erg-gmu/api/un/' + unNumber;
+    
+    fetch(ergApiUrl, { method: 'GET', mode: 'cors' })
+      .then(function(response) {
+        if (response.ok) {
+          return response.json();
+        }
+        throw new Error('Not found');
+      })
+      .then(function(data) {
+        if (data && data.name) {
+          var substance = {
+            name: data.name || 'UN ' + unNumber,
+            class: data.hazardClass || data.class || '9',
+            sds: 'hazmat',
+            guide: data.guide || data.erg || null,
+            fromAPI: true
+          };
+          displayResults(unNumber, substance);
+        } else {
+          // Fall back to generic with external links
+          fallbackToExternalLinks(unNumber);
+        }
+      })
+      .catch(function(err) {
+        console.log('ERG API error, trying PubChem:', err);
+        fetchFromPubChem(unNumber);
+      });
+  }
+
+  function fetchFromPubChem(unNumber) {
+    // PubChem compound search by UN number
+    var pubchemUrl = 'https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/UN' + unNumber + '/property/Title,MolecularFormula/JSON';
+    
+    fetch(pubchemUrl)
+      .then(function(response) {
+        if (response.ok) {
+          return response.json();
+        }
+        throw new Error('Not found in PubChem');
+      })
+      .then(function(data) {
+        if (data && data.PropertyTable && data.PropertyTable.Properties && data.PropertyTable.Properties[0]) {
+          var props = data.PropertyTable.Properties[0];
+          var substance = {
+            name: props.Title || 'UN ' + unNumber,
+            class: '9', // PubChem doesn't provide hazard class
+            sds: 'hazmat',
+            guide: null,
+            fromAPI: true,
+            formula: props.MolecularFormula
+          };
+          displayResults(unNumber, substance);
+        } else {
+          fallbackToExternalLinks(unNumber);
+        }
+      })
+      .catch(function(err) {
+        console.log('PubChem error:', err);
+        fallbackToExternalLinks(unNumber);
+      });
+  }
+
+  function fallbackToExternalLinks(unNumber) {
+    // Create a result that prominently features external lookup links
+    var substance = {
+      name: 'UN ' + unNumber + ' - Lookup Required',
+      class: '9',
+      sds: 'hazmat',
+      guide: null,
+      isUnknown: true,
+      needsLookup: true
+    };
+    displayResults(unNumber, substance);
   }
 
   // ── Display Results ──
-  function displayResults(unNumber) {
-    var substance = UN_NUMBERS[unNumber];
-    var isUnknown = !substance;
-    
-    // Create generic substance info for unknown UN numbers
-    if (isUnknown) {
-      substance = {
-        name: 'Unknown Hazardous Material (UN ' + unNumber + ')',
-        class: '9',
-        sds: 'hazardous-material',
-        guide: null,
-        isUnknown: true
-      };
+  function displayResults(unNumber, substance) {
+    // If called with just unNumber (from OCR), look it up
+    if (!substance) {
+      substance = UN_NUMBERS[unNumber];
+      if (!substance) {
+        lookupExternalAPI(unNumber);
+        return;
+      }
     }
     
-    var hazardClass = HAZARD_CLASSES[substance.class];
+    var hazardClass = HAZARD_CLASSES[substance.class] || HAZARD_CLASSES['9'];
 
     // Collect all applicable pictograms
     var pictogramKeys = [];
@@ -228,8 +319,19 @@ document.addEventListener('DOMContentLoaded', function () {
       ? '<span class="erg-guide-badge">ERG Guide ' + substance.guide + '</span>'
       : '';
 
-    var unknownWarning = substance.isUnknown
-      ? '<div class="unknown-warning"><i class="bi bi-exclamation-triangle"></i> UN number not in local database. Use the SDS links below to identify this material. Treat as potentially hazardous.</div>'
+    var apiSourceHtml = substance.fromAPI
+      ? '<span class="api-source-badge"><i class="bi bi-cloud-check"></i> External Data</span>'
+      : '';
+
+    var unknownWarning = '';
+    if (substance.needsLookup) {
+      unknownWarning = '<div class="unknown-warning"><i class="bi bi-exclamation-triangle"></i> UN number not found in databases. Use the lookup links below to identify this material. Treat as potentially hazardous.</div>';
+    } else if (substance.isUnknown) {
+      unknownWarning = '<div class="unknown-warning"><i class="bi bi-exclamation-triangle"></i> Limited data available. Use the SDS links below for complete information.</div>';
+    }
+
+    var formulaHtml = substance.formula
+      ? '<div class="formula-badge"><i class="bi bi-diagram-3"></i> ' + substance.formula + '</div>'
       : '';
 
     substanceCard.innerHTML =
@@ -241,6 +343,8 @@ document.addEventListener('DOMContentLoaded', function () {
           '</span>' +
           secondaryBadges +
           guideHtml +
+          apiSourceHtml +
+          formulaHtml +
         '</div>' +
         '<span class="un-badge">UN ' + unNumber + '</span>' +
       '</div>' +
