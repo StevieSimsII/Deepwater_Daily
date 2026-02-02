@@ -235,28 +235,54 @@ function getERGGuideUrl(guideNumber) {
 }
 
 // SDS lookup URLs - multiple sources
-function getSDSUrls(substance) {
+function getSDSUrls(substance, unNumber) {
   var encodedName = encodeURIComponent(substance.name);
-  return [
-    {
+  var links = [];
+  
+  // For unknown substances, prioritize UN number lookup
+  if (substance.isUnknown && unNumber) {
+    links.push({
+      name: "CAMEO Chemicals - UN " + unNumber,
+      url: "https://cameochemicals.noaa.gov/search/simple?la=en&q=UN" + unNumber
+    });
+    links.push({
+      name: "PHMSA Hazmat UN Lookup",
+      url: "https://www.phmsa.dot.gov/hazmat/erg/emergency-response-guidebook-erg"
+    });
+    links.push({
+      name: "UNECE UN Number Database",
+      url: "https://unece.org/transport/dangerous-goods/un-numbers-702"
+    });
+    links.push({
+      name: "Fisher Scientific Search",
+      url: "https://www.fishersci.com/us/en/catalog/search/sds?keyword=UN" + unNumber
+    });
+    links.push({
+      name: "Sigma-Aldrich Search",
+      url: "https://www.sigmaaldrich.com/US/en/search/UN" + unNumber + "?focus=documents&type=sds"
+    });
+  } else {
+    links.push({
       name: "Fisher Scientific SDS",
       url: "https://www.fishersci.com/us/en/catalog/search/sds?keyword=" + encodedName
-    },
-    {
+    });
+    links.push({
       name: "Sigma-Aldrich SDS",
       url: "https://www.sigmaaldrich.com/US/en/search/" + encodedName + "?focus=documents&page=1&perpage=30&sort=relevance&term=" + encodedName + "&type=sds"
-    },
-    {
+    });
+    links.push({
       name: "CAMEO Chemicals (NOAA)",
       url: "https://cameochemicals.noaa.gov/search/simple?la=en&q=" + encodedName
-    },
-    {
+    });
+    links.push({
       name: "ERG Guide",
       url: getERGGuideUrl(substance.guide)
-    },
-    {
+    });
+    links.push({
       name: "NIOSH Pocket Guide",
       url: "https://www.cdc.gov/niosh/npg/search.html?searchTerm=" + encodedName
-    }
-  ];
+    });
+  }
+  
+  return links;
 }

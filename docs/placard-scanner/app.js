@@ -147,18 +147,8 @@ document.addEventListener('DOMContentLoaded', function () {
       var numbers = text.match(/\b\d{4}\b/g);
 
       if (numbers && numbers.length > 0) {
-        // Try each detected number against our database
-        var found = false;
-        for (var i = 0; i < numbers.length; i++) {
-          if (UN_NUMBERS[numbers[i]]) {
-            displayResults(numbers[i]);
-            found = true;
-            break;
-          }
-        }
-        if (!found) {
-          showNotFound(numbers[0]);
-        }
+        // Use the first detected 4-digit number - works with any UN/NA number
+        displayResults(numbers[0]);
       } else {
         showNotFound(null);
       }
@@ -176,16 +166,26 @@ document.addEventListener('DOMContentLoaded', function () {
       showToast('Please enter a valid 4-digit UN/NA number.', 'error');
       return;
     }
-    if (UN_NUMBERS[num]) {
-      displayResults(num);
-    } else {
-      showNotFound(num);
-    }
+    // Accept any 4-digit UN/NA number
+    displayResults(num);
   }
 
   // ── Display Results ──
   function displayResults(unNumber) {
     var substance = UN_NUMBERS[unNumber];
+    var isUnknown = !substance;
+    
+    // Create generic substance info for unknown UN numbers
+    if (isUnknown) {
+      substance = {
+        name: 'Unknown Hazardous Material (UN ' + unNumber + ')',
+        class: '9',
+        sds: 'hazardous-material',
+        guide: null,
+        isUnknown: true
+      };
+    }
+    
     var hazardClass = HAZARD_CLASSES[substance.class];
 
     // Collect all applicable pictograms
@@ -228,6 +228,10 @@ document.addEventListener('DOMContentLoaded', function () {
       ? '<span class="erg-guide-badge">ERG Guide ' + substance.guide + '</span>'
       : '';
 
+    var unknownWarning = substance.isUnknown
+      ? '<div class="unknown-warning"><i class="bi bi-exclamation-triangle"></i> UN number not in local database. Use the SDS links below to identify this material. Treat as potentially hazardous.</div>'
+      : '';
+
     substanceCard.innerHTML =
       '<div class="substance-header">' +
         '<div>' +
@@ -239,7 +243,8 @@ document.addEventListener('DOMContentLoaded', function () {
           guideHtml +
         '</div>' +
         '<span class="un-badge">UN ' + unNumber + '</span>' +
-      '</div>';
+      '</div>' +
+      unknownWarning;
 
     // Pictograms
     pictogramList.innerHTML = '';
@@ -267,7 +272,7 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     // SDS links
-    var sdsUrlList = getSDSUrls(substance);
+    var sdsUrlList = getSDSUrls(substance, unNumber);
     var sdsHtml = '';
     sdsUrlList.forEach(function (link) {
       sdsHtml +=
@@ -349,7 +354,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     text += '\nSAFETY DATA SHEET LINKS\n';
     text += '------------------------------\n';
-    var sdsUrlList = getSDSUrls(substance);
+    var sdsUrlList = getSDSUrls(substance, unNumber);
     sdsUrlList.forEach(function (link) {
       text += link.name + ': ' + link.url + '\n';
     });
