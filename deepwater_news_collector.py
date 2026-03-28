@@ -512,6 +512,11 @@ def parse_args():
         default=5,
         help="Number of real CSV articles to include when using --teams-live-from-csv (1-5)."
     )
+    parser.add_argument(
+        "--teams-required",
+        action="store_true",
+        help="Exit with a nonzero status if Teams notification is skipped or fails."
+    )
     return parser.parse_args()
 
 def send_teams_notification(new_articles, current_date):
@@ -730,11 +735,15 @@ if __name__ == "__main__":
     try:
         args = parse_args()
         if args.teams_test:
-            run_teams_test_notification(args.teams_test_count)
+            teams_sent = run_teams_test_notification(args.teams_test_count)
         elif args.teams_live_from_csv:
-            run_teams_live_notification(args.teams_live_count)
+            teams_sent = run_teams_live_notification(args.teams_live_count)
         else:
             run_result = collect_news()
-            send_teams_notification(run_result["new_articles"], run_result["current_date"])
+            teams_sent = send_teams_notification(run_result["new_articles"], run_result["current_date"])
+
+        if args.teams_required and not teams_sent:
+            raise RuntimeError("Teams notification was required but was skipped or failed")
     except Exception as e:
         logger.error(f"Unhandled exception in the main process: {str(e)}")
+        raise

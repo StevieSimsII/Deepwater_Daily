@@ -30,7 +30,7 @@ jobs:
       - name: Refresh RSS data and notify Teams
         env:
           TEAMS_WEBHOOK_URL: ${{ secrets.TEAMS_WEBHOOK_URL }}
-        run: python deepwater_news_collector.py
+        run: python deepwater_news_collector.py --teams-required
 
       - name: Commit and push refreshed dataset
         run: |

@@ -33,4 +33,4 @@ jobs:
       - name: Send Teams card from live CSV dataset
         env:
           TEAMS_WEBHOOK_URL: ${{ secrets.TEAMS_WEBHOOK_URL }}
-        run: python deepwater_news_collector.py --teams-live-from-csv --teams-live-count ${{ inputs.article_count }}
+        run: python deepwater_news_collector.py --teams-live-from-csv --teams-live-count ${{ inputs.article_count }} --teams-required
