@@ -1,0 +1,36 @@
+name: Teams Live Notification Test
+
+on:
+  workflow_dispatch:
+    inputs:
+      article_count:
+        description: Number of latest articles to include in the Teams card
+        required: true
+        default: '5'
+
+permissions:
+  contents: read
+
+jobs:
+  send-live-card:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Send Teams card from live CSV dataset
+        env:
+          TEAMS_WEBHOOK_URL: ${{ secrets.TEAMS_WEBHOOK_URL }}
+        run: python deepwater_news_collector.py --teams-live-from-csv --teams-live-count ${{ inputs.article_count }}

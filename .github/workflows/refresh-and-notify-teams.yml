@@ -1,19 +1,15 @@
-name: Daily Deepwater News Collector
+name: Refresh And Notify Teams
 
 on:
-  schedule:
-    # Runs daily at 6:00 AM CST (12:00 PM UTC)
-    # CST is UTC-6, so 6:00 AM CST = 12:00 PM UTC
-    - cron: '0 12 * * *'
-  workflow_dispatch:  # Allows manual triggering from GitHub UI
+  workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  collect-news:
+  refresh-and-notify:
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -31,16 +27,12 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Run news collector
+      - name: Refresh RSS data and notify Teams
         env:
           TEAMS_WEBHOOK_URL: ${{ secrets.TEAMS_WEBHOOK_URL }}
         run: python deepwater_news_collector.py
 
-      - name: Update last update timestamp
-        run: |
-          echo '{"last_update": "'$(date -u +"%Y-%m-%dT%H:%M:%SZ")'", "status": "success"}' > docs/data/last_update.json
-
-      - name: Commit and push changes
+      - name: Commit and push refreshed dataset
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
@@ -48,6 +40,6 @@ jobs:
           if git diff --staged --quiet; then
             echo "No changes to commit"
           else
-            git commit -m "📰 Daily news update - $(date -u +"%Y-%m-%d")"
+            git commit -m "Manual refresh and Teams notification - $(date -u +"%Y-%m-%d")"
             git push
           fi

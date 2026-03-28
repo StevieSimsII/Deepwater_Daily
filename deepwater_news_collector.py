@@ -1,4 +1,5 @@
 import requests
+import argparse
 import csv
 import os
 import datetime
@@ -9,6 +10,7 @@ import feedparser
 import ssl
 import html
 import shutil
+import json
 from pathlib import Path
 from urllib.parse import urlparse
 from bs4 import BeautifulSoup
@@ -37,6 +39,9 @@ BASE_DIR = Path(__file__).parent
 CSV_OUTPUT_PATH = BASE_DIR / "docs" / "data" / "deepwater_news.csv"
 HISTORY_FILE = BASE_DIR / "article_history.txt"
 MAX_ARTICLES_PER_SOURCE = 5
+DEFAULT_SITE_URL = "https://steviesimsii.github.io/Deepwater_Daily/"
+TEAMS_MAX_CARD_ARTICLES = 3
+TEAMS_DESCRIPTION_LIMIT = 280
 
 # Secondary CSV locations
 SECONDARY_CSV_PATHS = [
@@ -299,6 +304,279 @@ def parse_date(date_str):
                 logger.warning(f"Could not parse date format: {date_str}")
                 return datetime.datetime(1900, 1, 1)
 
+def truncate_text(text, max_length):
+    """Trim text to a reasonable length for cards and logs."""
+    if not text:
+        return ""
+
+    normalized = re.sub(r'\s+', ' ', text).strip()
+    if len(normalized) <= max_length:
+        return normalized
+
+    return normalized[: max_length - 3].rstrip() + "..."
+
+def build_teams_card_payload(new_articles, current_date, site_url):
+    """Build an Adaptive Card payload for Microsoft Teams."""
+    article_count = len(new_articles)
+    card_articles = new_articles[:TEAMS_MAX_CARD_ARTICLES]
+    latest_source_line = ", ".join(
+        sorted({article.get("source", "Unknown source") for article in card_articles if article.get("source")})
+    )
+
+    body = [
+        {
+            "type": "TextBlock",
+            "text": "Deepwater Daily",
+            "size": "Large",
+            "weight": "Bolder",
+            "wrap": True
+        },
+        {
+            "type": "TextBlock",
+            "text": f"{article_count} new article{'s' if article_count != 1 else ''} for {current_date}",
+            "spacing": "None",
+            "isSubtle": True,
+            "wrap": True
+        },
+        {
+            "type": "TextBlock",
+            "text": "Latest deepwater, offshore, LNG, and Gulf-focused coverage in a readable daily briefing.",
+            "spacing": "Small",
+            "wrap": True
+        }
+    ]
+
+    if latest_source_line:
+        body.append(
+            {
+                "type": "TextBlock",
+                "text": f"Featured sources: {latest_source_line}",
+                "isSubtle": True,
+                "spacing": "Small",
+                "wrap": True
+            }
+        )
+
+    for article in card_articles:
+        category = article.get("category", "oil & gas").title()
+        description = truncate_text(article.get("description", ""), TEAMS_DESCRIPTION_LIMIT)
+        meta_parts = [article.get("source", "Unknown source")]
+        if article.get("date"):
+            meta_parts.append(article["date"])
+        if category:
+            meta_parts.append(category)
+
+        body.append(
+            {
+                "type": "Container",
+                "separator": True,
+                "items": [
+                    {
+                        "type": "TextBlock",
+                        "text": f"[{article.get('title', 'Untitled article')}]({article.get('url', site_url)})",
+                        "weight": "Bolder",
+                        "wrap": True
+                    },
+                    {
+                        "type": "TextBlock",
+                        "text": " | ".join(meta_parts),
+                        "isSubtle": True,
+                        "spacing": "None",
+                        "wrap": True
+                    },
+                    {
+                        "type": "TextBlock",
+                        "text": description or "No description available.",
+                        "wrap": True,
+                        "spacing": "Small",
+                        "maxLines": 6
+                    }
+                ]
+            }
+        )
+
+    if article_count > TEAMS_MAX_CARD_ARTICLES:
+        body.append(
+            {
+                "type": "TextBlock",
+                "text": f"Showing the top {TEAMS_MAX_CARD_ARTICLES} stories. Open Deepwater Daily for the remaining {article_count - TEAMS_MAX_CARD_ARTICLES} article{'s' if article_count - TEAMS_MAX_CARD_ARTICLES != 1 else ''}.",
+                "isSubtle": True,
+                "wrap": True,
+                "separator": True
+            }
+        )
+
+    return {
+        "type": "message",
+        "attachments": [
+            {
+                "contentType": "application/vnd.microsoft.card.adaptive",
+                "contentUrl": None,
+                "content": {
+                    "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+                    "type": "AdaptiveCard",
+                    "version": "1.4",
+                    "body": body,
+                    "actions": [
+                        {
+                            "type": "Action.OpenUrl",
+                            "title": "Open Deepwater Daily",
+                            "url": site_url
+                        }
+                    ]
+                }
+            }
+        ]
+    }
+
+def build_sample_articles(current_date, site_url, count=3):
+    """Build sample articles for validating the Teams card layout."""
+    sample_pool = [
+        {
+            "date": current_date,
+            "title": "Sample Deepwater Card: Kaikias Waterflood Update",
+            "description": "This sample item shows how a subsea project headline, summary, and source metadata will render in Microsoft Teams.",
+            "source": "deepwaterdaily.test",
+            "url": site_url,
+            "category": "subsea & pipelines",
+            "source_type": "Test Feed",
+            "insights": "Sample Teams notification card."
+        },
+        {
+            "date": current_date,
+            "title": "Sample Deepwater Card: Gulf Production Briefing",
+            "description": "Use this card to verify title links, summary trimming, and the overall readability of your Teams channel notification.",
+            "source": "deepwaterdaily.test",
+            "url": site_url,
+            "category": "production",
+            "source_type": "Test Feed",
+            "insights": "Sample Teams notification card."
+        },
+        {
+            "date": current_date,
+            "title": "Sample Deepwater Card: LNG Market Snapshot",
+            "description": "This sample entry helps confirm the Adaptive Card layout before the scheduled workflow starts posting live daily articles.",
+            "source": "deepwaterdaily.test",
+            "url": site_url,
+            "category": "lng & integrated gas",
+            "source_type": "Test Feed",
+            "insights": "Sample Teams notification card."
+        },
+        {
+            "date": current_date,
+            "title": "Sample Deepwater Card: Drillship Contract Watch",
+            "description": "A fourth sample row lets you check how multiple articles stack visually when the Teams card grows longer.",
+            "source": "deepwaterdaily.test",
+            "url": site_url,
+            "category": "deepwater drilling",
+            "source_type": "Test Feed",
+            "insights": "Sample Teams notification card."
+        },
+        {
+            "date": current_date,
+            "title": "Sample Deepwater Card: New Exploration Acreage",
+            "description": "Use five items to preview the maximum number of article blocks that the Teams card will show before truncating the list.",
+            "source": "deepwaterdaily.test",
+            "url": site_url,
+            "category": "exploration",
+            "source_type": "Test Feed",
+            "insights": "Sample Teams notification card."
+        }
+    ]
+
+    safe_count = max(1, min(count, len(sample_pool)))
+    return sample_pool[:safe_count]
+
+def parse_args():
+    """Parse command-line options for collector and Teams test mode."""
+    parser = argparse.ArgumentParser(description="Collect Deepwater Daily news and optionally test Teams delivery.")
+    parser.add_argument(
+        "--teams-test",
+        action="store_true",
+        help="Send a sample Teams Adaptive Card without running the RSS collection pipeline."
+    )
+    parser.add_argument(
+        "--teams-test-count",
+        type=int,
+        default=3,
+        help="Number of sample articles to include when using --teams-test (1-5)."
+    )
+    parser.add_argument(
+        "--teams-live-from-csv",
+        action="store_true",
+        help="Send a Teams Adaptive Card using the latest real articles already stored in docs/data/deepwater_news.csv."
+    )
+    parser.add_argument(
+        "--teams-live-count",
+        type=int,
+        default=5,
+        help="Number of real CSV articles to include when using --teams-live-from-csv (1-5)."
+    )
+    return parser.parse_args()
+
+def send_teams_notification(new_articles, current_date):
+    """Send an Adaptive Card notification to Microsoft Teams when configured."""
+    webhook_url = os.getenv("TEAMS_WEBHOOK_URL", "").strip()
+    if not webhook_url:
+        logger.info("TEAMS_WEBHOOK_URL not configured; skipping Teams notification")
+        return False
+
+    if not new_articles:
+        logger.info("No new articles found; skipping Teams notification")
+        return False
+
+    site_url = os.getenv("TEAMS_SITE_URL", DEFAULT_SITE_URL).strip() or DEFAULT_SITE_URL
+    payload = build_teams_card_payload(new_articles, current_date, site_url)
+    payload_size = len(json.dumps(payload).encode("utf-8"))
+
+    if payload_size > 28000:
+        logger.warning("Teams payload exceeded size limit; trimming descriptions")
+        for article in new_articles[:TEAMS_MAX_CARD_ARTICLES]:
+            article["description"] = truncate_text(article.get("description", ""), 96)
+        payload = build_teams_card_payload(new_articles, current_date, site_url)
+
+    try:
+        response = requests.post(webhook_url, json=payload, timeout=20)
+        response.raise_for_status()
+        logger.info("Posted %s new articles to Microsoft Teams", len(new_articles))
+        return True
+    except requests.RequestException as exc:
+        logger.error("Failed to post Microsoft Teams notification: %s", exc)
+        return False
+
+def run_teams_test_notification(sample_count):
+    """Send a sample Teams card on demand for manual validation."""
+    current_date = datetime.datetime.now().strftime("%Y-%m-%d")
+    site_url = os.getenv("TEAMS_SITE_URL", DEFAULT_SITE_URL).strip() or DEFAULT_SITE_URL
+    sample_articles = build_sample_articles(current_date, site_url, sample_count)
+    logger.info("Sending sample Microsoft Teams card with %s articles", len(sample_articles))
+    return send_teams_notification(sample_articles, current_date)
+
+def get_latest_articles_from_csv(limit=5):
+    """Load the latest articles from the existing CSV for manual Teams posts."""
+    existing_articles, _ = read_existing_articles()
+    if not existing_articles:
+        return []
+
+    sorted_articles = sorted(
+        existing_articles,
+        key=lambda article: parse_date(article.get("date", "")),
+        reverse=True
+    )
+    safe_limit = max(1, min(limit, TEAMS_MAX_CARD_ARTICLES))
+    return sorted_articles[:safe_limit]
+
+def run_teams_live_notification(article_count):
+    """Send a Teams card from the latest real articles already stored in the repo CSV."""
+    live_articles = get_latest_articles_from_csv(article_count)
+    if not live_articles:
+        logger.warning("No articles found in CSV dataset; cannot send live Teams notification")
+        return False
+
+    current_date = live_articles[0].get("date") or datetime.datetime.now().strftime("%Y-%m-%d")
+    logger.info("Sending live Microsoft Teams card with %s CSV articles", len(live_articles))
+    return send_teams_notification(live_articles, current_date)
+
 def read_existing_articles():
     """Read all articles from the existing CSV file."""
     existing_articles = []
@@ -338,6 +616,11 @@ def collect_news():
     last_update = {
         "last_updated": current_date,
         "timestamp": iso_timestamp
+    }
+    result = {
+        "current_date": current_date,
+        "timestamp": iso_timestamp,
+        "new_articles": []
     }
 
     update_info_path = os.path.join(os.path.dirname(CSV_OUTPUT_PATH), "last_update.json")
@@ -437,11 +720,21 @@ def collect_news():
                 logger.error(f"Error copying CSV to {secondary_path}: {str(e)}")
         
         logger.info("CSV update completed successfully")
+        result["new_articles"] = new_articles
     else:
         logger.info("No new articles found to add")
 
+    return result
+
 if __name__ == "__main__":
     try:
-        collect_news()
+        args = parse_args()
+        if args.teams_test:
+            run_teams_test_notification(args.teams_test_count)
+        elif args.teams_live_from_csv:
+            run_teams_live_notification(args.teams_live_count)
+        else:
+            run_result = collect_news()
+            send_teams_notification(run_result["new_articles"], run_result["current_date"])
     except Exception as e:
         logger.error(f"Unhandled exception in the main process: {str(e)}")
