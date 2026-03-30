@@ -1,0 +1,50 @@
+name: Telegram Digest Test
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Test mode: "sample" sends placeholder articles, "live" uses real CSV data'
+        required: true
+        default: 'live'
+        type: choice
+        options:
+          - sample
+          - live
+      article_count:
+        description: 'Number of articles to include (1–5)'
+        required: false
+        default: '5'
+
+jobs:
+  telegram-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Send test Telegram message (sample)
+        if: ${{ inputs.mode == 'sample' }}
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python deepwater_news_collector.py --telegram-test --telegram-test-count ${{ inputs.article_count }} --telegram-required
+
+      - name: Send test Telegram message (live CSV)
+        if: ${{ inputs.mode == 'live' }}
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python deepwater_news_collector.py --telegram-live-from-csv --telegram-live-count ${{ inputs.article_count }} --telegram-required

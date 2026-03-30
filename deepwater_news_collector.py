@@ -585,6 +585,104 @@ def run_email_live_notification(article_count):
     return send_email_notification(live_articles, current_date)
 
 
+TELEGRAM_MAX_ARTICLES = 5
+TELEGRAM_DESCRIPTION_LIMIT = 200
+
+
+def build_telegram_message(new_articles, current_date, site_url):
+    """Build an HTML-formatted Telegram message for the daily digest."""
+    article_count = len(new_articles)
+    telegram_articles = new_articles[:TELEGRAM_MAX_ARTICLES]
+
+    lines = [
+        f"<b>Deepwater Daily</b>",
+        f"{article_count} new article{'s' if article_count != 1 else ''} — {current_date}",
+        "",
+    ]
+
+    for article in telegram_articles:
+        title = article.get("title", "Untitled article")
+        url = article.get("url", site_url)
+        source = article.get("source", "Unknown source")
+        category = article.get("category", "oil & gas").title()
+        description = truncate_text(article.get("description", ""), TELEGRAM_DESCRIPTION_LIMIT)
+
+        lines.append(f'<b><a href="{url}">{html.escape(title)}</a></b>')
+        lines.append(f'<i>{html.escape(source)} | {html.escape(category)}</i>')
+        if description:
+            lines.append(html.escape(description))
+        lines.append("")
+
+    if article_count > TELEGRAM_MAX_ARTICLES:
+        remaining = article_count - TELEGRAM_MAX_ARTICLES
+        lines.append(f'<i>+{remaining} more article{"s" if remaining != 1 else ""}. <a href="{site_url}">Open Deepwater Daily</a></i>')
+    else:
+        lines.append(f'<a href="{site_url}">Open Deepwater Daily</a>')
+
+    return "\n".join(lines)
+
+
+def send_telegram_notification(new_articles, current_date):
+    """Send a Telegram message via Bot API when credentials are configured."""
+    bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
+    chat_id = os.getenv("TELEGRAM_CHAT_ID", "").strip()
+
+    if not bot_token or not chat_id:
+        logger.info("Telegram credentials not configured; skipping Telegram notification")
+        return False
+
+    if not new_articles:
+        logger.info("No new articles found; skipping Telegram notification")
+        return False
+
+    site_url = os.getenv("TEAMS_SITE_URL", DEFAULT_SITE_URL).strip() or DEFAULT_SITE_URL
+    message = build_telegram_message(new_articles, current_date, site_url)
+
+    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+    payload = {
+        "chat_id": chat_id,
+        "text": message,
+        "parse_mode": "HTML",
+        "disable_web_page_preview": True,
+    }
+
+    try:
+        response = requests.post(url, json=payload, timeout=20)
+        response.raise_for_status()
+        logger.info("Posted %s new articles to Telegram", len(new_articles))
+        return True
+    except Exception as exc:
+        logger.error("Failed to send Telegram notification: %s", exc)
+        return False
+
+
+def run_telegram_test_notification(sample_count):
+    """Send a test Telegram message using sample articles."""
+    current_date = datetime.datetime.now().strftime("%Y-%m-%d")
+    site_url = os.getenv("TEAMS_SITE_URL", DEFAULT_SITE_URL).strip() or DEFAULT_SITE_URL
+    sample_articles = build_sample_articles(current_date, site_url, sample_count)
+    return send_telegram_notification(sample_articles, current_date)
+
+
+def run_telegram_live_notification(article_count):
+    """Send a Telegram message using real articles already stored in the CSV."""
+    if not os.path.exists(CSV_OUTPUT_PATH):
+        logger.warning("CSV not found; cannot send live Telegram notification")
+        return False
+    live_articles = []
+    with open(CSV_OUTPUT_PATH, newline="", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            live_articles.append(row)
+            if len(live_articles) >= article_count:
+                break
+    if not live_articles:
+        logger.warning("No articles found in CSV dataset; cannot send live Telegram notification")
+        return False
+    current_date = live_articles[0].get("date", datetime.datetime.now().strftime("%Y-%m-%d"))
+    return send_telegram_notification(live_articles, current_date)
+
+
 def build_sample_articles(current_date, site_url, count=3):
     """Build sample articles for validating the Teams card layout."""
     sample_pool = [
@@ -699,6 +797,33 @@ def parse_args():
         "--email-required",
         action="store_true",
         help="Exit with a nonzero status if email notification is skipped or fails."
+    )
+    parser.add_argument(
+        "--telegram-test",
+        action="store_true",
+        help="Send a sample Telegram message without running the RSS collection pipeline."
+    )
+    parser.add_argument(
+        "--telegram-test-count",
+        type=int,
+        default=3,
+        help="Number of sample articles to include when using --telegram-test (1-5)."
+    )
+    parser.add_argument(
+        "--telegram-live-from-csv",
+        action="store_true",
+        help="Send a Telegram message using the latest real articles already stored in docs/data/deepwater_news.csv."
+    )
+    parser.add_argument(
+        "--telegram-live-count",
+        type=int,
+        default=5,
+        help="Number of real CSV articles to include when using --telegram-live-from-csv (1-5)."
+    )
+    parser.add_argument(
+        "--telegram-required",
+        action="store_true",
+        help="Exit with a nonzero status if Telegram notification is skipped or fails."
     )
     return parser.parse_args()
 
@@ -918,30 +1043,44 @@ if __name__ == "__main__":
     try:
         args = parse_args()
 
-        # --- Teams path ---
+        # --- Single-channel test paths ---
         if args.teams_test:
             teams_sent = run_teams_test_notification(args.teams_test_count)
             email_sent = False
+            telegram_sent = False
         elif args.teams_live_from_csv:
             teams_sent = run_teams_live_notification(args.teams_live_count)
             email_sent = False
-        # --- Email-only test paths ---
+            telegram_sent = False
         elif args.email_test:
             teams_sent = False
             email_sent = run_email_test_notification(args.email_test_count)
+            telegram_sent = False
         elif args.email_live_from_csv:
             teams_sent = False
             email_sent = run_email_live_notification(args.email_live_count)
-        # --- Normal collection: send both Teams and email ---
+            telegram_sent = False
+        elif args.telegram_test:
+            teams_sent = False
+            email_sent = False
+            telegram_sent = run_telegram_test_notification(args.telegram_test_count)
+        elif args.telegram_live_from_csv:
+            teams_sent = False
+            email_sent = False
+            telegram_sent = run_telegram_live_notification(args.telegram_live_count)
+        # --- Normal collection: send all channels ---
         else:
             run_result = collect_news()
             teams_sent = send_teams_notification(run_result["new_articles"], run_result["current_date"])
             email_sent = send_email_notification(run_result["new_articles"], run_result["current_date"])
+            telegram_sent = send_telegram_notification(run_result["new_articles"], run_result["current_date"])
 
         if args.teams_required and not teams_sent:
             raise RuntimeError("Teams notification was required but was skipped or failed")
         if args.email_required and not email_sent:
             raise RuntimeError("Email notification was required but was skipped or failed")
+        if args.telegram_required and not telegram_sent:
+            raise RuntimeError("Telegram notification was required but was skipped or failed")
     except Exception as e:
         logger.error(f"Unhandled exception in the main process: {str(e)}")
         raise
