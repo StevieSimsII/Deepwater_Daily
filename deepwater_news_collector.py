@@ -11,6 +11,9 @@ import ssl
 import html
 import shutil
 import json
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from pathlib import Path
 from urllib.parse import urlparse
 from bs4 import BeautifulSoup
@@ -42,6 +45,8 @@ MAX_ARTICLES_PER_SOURCE = 5
 DEFAULT_SITE_URL = "https://steviesimsii.github.io/Deepwater_Daily/"
 TEAMS_MAX_CARD_ARTICLES = 3
 TEAMS_DESCRIPTION_LIMIT = 280
+EMAIL_MAX_ARTICLES = 5
+EMAIL_DESCRIPTION_LIMIT = 400
 
 # Secondary CSV locations
 SECONDARY_CSV_PATHS = [
@@ -429,6 +434,157 @@ def build_teams_card_payload(new_articles, current_date, site_url):
         ]
     }
 
+def build_email_html(new_articles, current_date, site_url):
+    """Build an HTML email body for the daily Deepwater Daily digest."""
+    article_count = len(new_articles)
+    email_articles = new_articles[:EMAIL_MAX_ARTICLES]
+
+    source_set = sorted({a.get("source", "") for a in email_articles if a.get("source")})
+    source_line = ", ".join(source_set) if source_set else ""
+
+    articles_html = ""
+    for article in email_articles:
+        category = article.get("category", "oil & gas").title()
+        description = truncate_text(article.get("description", ""), EMAIL_DESCRIPTION_LIMIT)
+        meta_parts = [article.get("source", "Unknown source")]
+        if article.get("date"):
+            meta_parts.append(article["date"])
+        if category:
+            meta_parts.append(category)
+        meta_line = " &nbsp;|&nbsp; ".join(html.escape(p) for p in meta_parts)
+        title_text = html.escape(article.get("title", "Untitled article"))
+        article_url = article.get("url", site_url)
+        description_text = html.escape(description) if description else "No description available."
+
+        articles_html += f"""
+        <div style="border-top:1px solid #e0e0e0;padding:16px 0;">
+          <p style="margin:0 0 4px;font-size:16px;font-weight:600;">
+            <a href="{article_url}" style="color:#005f8c;text-decoration:none;">{title_text}</a>
+          </p>
+          <p style="margin:0 0 8px;font-size:12px;color:#888;">{meta_line}</p>
+          <p style="margin:0;font-size:14px;color:#333;line-height:1.5;">{description_text}</p>
+        </div>"""
+
+    overflow_note = ""
+    if article_count > EMAIL_MAX_ARTICLES:
+        remaining = article_count - EMAIL_MAX_ARTICLES
+        overflow_note = f"""
+        <p style="font-size:13px;color:#888;border-top:1px solid #e0e0e0;padding-top:12px;margin-top:0;">
+          Showing top {EMAIL_MAX_ARTICLES} stories.
+          <a href="{site_url}" style="color:#005f8c;">Open Deepwater Daily</a> for the remaining {remaining} article{"s" if remaining != 1 else ""}.
+        </p>"""
+
+    source_block = ""
+    if source_line:
+        source_block = f'<p style="margin:4px 0 0;font-size:12px;color:#888;">Featured sources: {html.escape(source_line)}</p>'
+
+    return f"""<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#f5f5f5;font-family:Georgia,serif;">
+  <div style="max-width:640px;margin:32px auto;background:#fff;border-radius:6px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.08);">
+    <div style="background:#003a52;padding:24px 32px;">
+      <h1 style="margin:0;color:#fff;font-size:24px;letter-spacing:.5px;">Deepwater Daily</h1>
+      <p style="margin:6px 0 0;color:#a0c8d8;font-size:14px;">
+        {article_count} new article{"s" if article_count != 1 else ""} &mdash; {html.escape(current_date)}
+      </p>
+      {source_block}
+    </div>
+    <div style="padding:0 32px 8px;">
+      {articles_html}
+      {overflow_note}
+    </div>
+    <div style="background:#f5f5f5;padding:16px 32px;text-align:center;">
+      <a href="{site_url}" style="display:inline-block;background:#005f8c;color:#fff;text-decoration:none;padding:10px 24px;border-radius:4px;font-size:14px;font-family:Arial,sans-serif;">
+        Open Deepwater Daily
+      </a>
+      <p style="margin:12px 0 0;font-size:11px;color:#aaa;font-family:Arial,sans-serif;">
+        You are receiving this because you subscribed to Deepwater Daily email updates.
+      </p>
+    </div>
+  </div>
+</body>
+</html>"""
+
+
+def send_email_notification(new_articles, current_date):
+    """Send an HTML digest email when SMTP credentials are configured."""
+    smtp_host = os.getenv("EMAIL_SMTP_HOST", "").strip()
+    smtp_port_str = os.getenv("EMAIL_SMTP_PORT", "587").strip()
+    username = os.getenv("EMAIL_USERNAME", "").strip()
+    password = os.getenv("EMAIL_PASSWORD", "").strip()
+    to_raw = os.getenv("EMAIL_TO", "").strip()
+    from_addr = os.getenv("EMAIL_FROM", username).strip() or username
+
+    if not all([smtp_host, username, password, to_raw]):
+        logger.info("Email credentials not fully configured; skipping email notification")
+        return False
+
+    if not new_articles:
+        logger.info("No new articles found; skipping email notification")
+        return False
+
+    try:
+        smtp_port = int(smtp_port_str)
+    except ValueError:
+        logger.error("EMAIL_SMTP_PORT is not a valid integer: %s", smtp_port_str)
+        return False
+
+    recipients = [addr.strip() for addr in to_raw.split(",") if addr.strip()]
+    if not recipients:
+        logger.error("EMAIL_TO contains no valid addresses")
+        return False
+
+    site_url = os.getenv("TEAMS_SITE_URL", DEFAULT_SITE_URL).strip() or DEFAULT_SITE_URL
+    subject = f"Deepwater Daily — {len(new_articles)} new article{'s' if len(new_articles) != 1 else ''} for {current_date}"
+    html_body = build_email_html(new_articles, current_date, site_url)
+
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = subject
+    msg["From"] = from_addr
+    msg["To"] = ", ".join(recipients)
+    msg.attach(MIMEText(html_body, "html", "utf-8"))
+
+    try:
+        with smtplib.SMTP(smtp_host, smtp_port, timeout=30) as server:
+            server.ehlo()
+            server.starttls()
+            server.login(username, password)
+            server.sendmail(from_addr, recipients, msg.as_string())
+        logger.info("Sent email digest to %s recipient(s)", len(recipients))
+        return True
+    except Exception as exc:
+        logger.error("Failed to send email notification: %s", exc)
+        return False
+
+
+def run_email_test_notification(sample_count):
+    """Send a test email using sample articles."""
+    current_date = datetime.datetime.now().strftime("%Y-%m-%d")
+    site_url = os.getenv("TEAMS_SITE_URL", DEFAULT_SITE_URL).strip() or DEFAULT_SITE_URL
+    sample_articles = build_sample_articles(current_date, site_url, sample_count)
+    return send_email_notification(sample_articles, current_date)
+
+
+def run_email_live_notification(article_count):
+    """Send an email using real articles already stored in the CSV."""
+    if not os.path.exists(CSV_OUTPUT_PATH):
+        logger.warning("CSV not found; cannot send live email notification")
+        return False
+    live_articles = []
+    with open(CSV_OUTPUT_PATH, newline="", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            live_articles.append(row)
+            if len(live_articles) >= article_count:
+                break
+    if not live_articles:
+        logger.warning("No articles found in CSV dataset; cannot send live email notification")
+        return False
+    current_date = live_articles[0].get("date", datetime.datetime.now().strftime("%Y-%m-%d"))
+    return send_email_notification(live_articles, current_date)
+
+
 def build_sample_articles(current_date, site_url, count=3):
     """Build sample articles for validating the Teams card layout."""
     sample_pool = [
@@ -516,6 +672,33 @@ def parse_args():
         "--teams-required",
         action="store_true",
         help="Exit with a nonzero status if Teams notification is skipped or fails."
+    )
+    parser.add_argument(
+        "--email-test",
+        action="store_true",
+        help="Send a sample email digest without running the RSS collection pipeline."
+    )
+    parser.add_argument(
+        "--email-test-count",
+        type=int,
+        default=3,
+        help="Number of sample articles to include when using --email-test (1-5)."
+    )
+    parser.add_argument(
+        "--email-live-from-csv",
+        action="store_true",
+        help="Send an email digest using the latest real articles already stored in docs/data/deepwater_news.csv."
+    )
+    parser.add_argument(
+        "--email-live-count",
+        type=int,
+        default=5,
+        help="Number of real CSV articles to include when using --email-live-from-csv (1-5)."
+    )
+    parser.add_argument(
+        "--email-required",
+        action="store_true",
+        help="Exit with a nonzero status if email notification is skipped or fails."
     )
     return parser.parse_args()
 
@@ -734,16 +917,31 @@ def collect_news():
 if __name__ == "__main__":
     try:
         args = parse_args()
+
+        # --- Teams path ---
         if args.teams_test:
             teams_sent = run_teams_test_notification(args.teams_test_count)
+            email_sent = False
         elif args.teams_live_from_csv:
             teams_sent = run_teams_live_notification(args.teams_live_count)
+            email_sent = False
+        # --- Email-only test paths ---
+        elif args.email_test:
+            teams_sent = False
+            email_sent = run_email_test_notification(args.email_test_count)
+        elif args.email_live_from_csv:
+            teams_sent = False
+            email_sent = run_email_live_notification(args.email_live_count)
+        # --- Normal collection: send both Teams and email ---
         else:
             run_result = collect_news()
             teams_sent = send_teams_notification(run_result["new_articles"], run_result["current_date"])
+            email_sent = send_email_notification(run_result["new_articles"], run_result["current_date"])
 
         if args.teams_required and not teams_sent:
             raise RuntimeError("Teams notification was required but was skipped or failed")
+        if args.email_required and not email_sent:
+            raise RuntimeError("Email notification was required but was skipped or failed")
     except Exception as e:
         logger.error(f"Unhandled exception in the main process: {str(e)}")
         raise
