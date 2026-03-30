@@ -648,7 +648,9 @@ def send_telegram_notification(new_articles, current_date):
 
     try:
         response = requests.post(url, json=payload, timeout=20)
-        response.raise_for_status()
+        if not response.ok:
+            logger.error("Telegram API error %s: %s", response.status_code, response.text)
+            response.raise_for_status()
         logger.info("Posted %s new articles to Telegram", len(new_articles))
         return True
     except Exception as exc:
