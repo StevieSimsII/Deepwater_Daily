@@ -106,6 +106,7 @@
 
 html {
     scroll-behavior: smooth;
+    scroll-padding-top: 70px; /* account for sticky header height */
 }
 
 body {
@@ -697,24 +698,33 @@ body {
    ============================================ */
 
 @media (max-width: 768px) {
+    html {
+        scroll-padding-top: 110px; /* taller header on mobile due to wrapped nav */
+    }
+
     .header-container {
         flex-wrap: wrap;
-        padding: var(--spacing-md);
+        padding: var(--spacing-sm) var(--spacing-md);
     }
-    
+
     .nav {
         order: 3;
         width: 100%;
         justify-content: center;
-        padding-top: var(--spacing-md);
+        padding-top: var(--spacing-sm);
         border-top: 1px solid var(--border-color);
-        margin-top: var(--spacing-md);
+        margin-top: var(--spacing-sm);
     }
     
     .header-actions {
         margin-left: auto;
     }
-    
+
+    .nav-link {
+        padding: var(--spacing-xs) 0;
+        font-size: 0.9rem;
+    }
+
     .search-input {
         width: 150px;
     }
