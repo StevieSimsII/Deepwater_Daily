@@ -2,9 +2,11 @@ name: Daily Deepwater News Collector
 
 on:
   schedule:
-    # Runs daily at 6:00 AM CST (12:00 PM UTC)
-    # CST is UTC-6, so 6:00 AM CST = 12:00 PM UTC
+    # GitHub Actions schedules are in UTC.
+    # These run at 6:00 AM CST and 2:00 PM CST (12:00 PM and 8:00 PM UTC).
+    # During daylight saving time in Chicago, that becomes 7:00 AM and 3:00 PM CDT.
     - cron: '0 12 * * *'
+    - cron: '0 20 * * *'
   workflow_dispatch:  # Allows manual triggering from GitHub UI
 
 permissions:
